@@ -16,8 +16,45 @@ import paramiko
 import fl_models
 import fl_datasets
 import fl_utils
-from training_config import *
 
+
+@dataclass
+class GlobalConfig:
+    dataset_type: str = 'MNIST'
+    model_type: str = 'LR'
+    use_cuda: bool = True
+    training_structure: str = 'local'
+
+    worker_num: int = 10
+
+    epoch_start: int = 0
+    epoch = 0
+    global_update_number: int = 10
+    test_batch_size: int = 1000
+
+    # global_config.writer.add_scalar('Accuracy/test', np.random.random(), n_iter)
+    writer: SummaryWriter = SummaryWriter()
+
+
+@dataclass
+class LocalTrainingConfig:
+    available_gpu: list = ["0", "1"]
+    pass
+
+
+@dataclass
+class RemoteTrainingConfig:
+    pass
+
+
+@dataclass
+class DockerTrainingConfig:
+    pass
+
+@dataclass
+class ClientTrainingConfig:
+    
+    pass
 
 def send_client_scrpts():
 
@@ -50,15 +87,14 @@ def main():
     test_loader = fl_utils.create_server_test_loader(
         global_config, kwargs, test_dataset)
 
-    """ Initial worker process
-    """
-    # Send worker client scripts and start worker process
-    for worker_idx in range(global_config.worker_num):
-        if global_config.training_structure == 'local':
-            dst_url = "localhost"
+    # Training
+    for epoch_idx in range(1, 1 + global_config.epoch):
+        
+        pass
 
-    process_list = [Process(target=send_para, args=())
-                    for _ in range(global_config.worker_num)]
+
+    
+    process_list = [Process(target=send_para, args=()) for _ in range(global_config.worker_num)]
 
 
 def send_para():
