@@ -7,70 +7,29 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 import torch.distributed as dist
 
-from dataclasses import dataclass
+from functools import singledispatch
 import numpy as np
-from multiprocessing import Process, Pool
+from multiprocessing import (
+    Process,
+    Pool
+)
 import os
 import paramiko
 
-import fl_models
-import fl_datasets
 import fl_utils
+from config_module.config import *
 
-
-@dataclass
-class GlobalConfig:
-    dataset_type: str = 'MNIST'
-    model_type: str = 'LR'
-    use_cuda: bool = True
-    training_structure: str = 'local'
-
-    worker_num: int = 10
-
-    epoch_start: int = 0
-    epoch = 0
-    global_update_number: int = 10
-    test_batch_size: int = 1000
-
-    # global_config.writer.add_scalar('Accuracy/test', np.random.random(), n_iter)
-    writer: SummaryWriter = SummaryWriter()
-
-
-@dataclass
-class LocalTrainingConfig:
-    available_gpu: list = ["0", "1"]
-    pass
-
-
-@dataclass
-class RemoteTrainingConfig:
-    pass
-
-
-@dataclass
-class DockerTrainingConfig:
-    pass
-
-@dataclass
-class ClientTrainingConfig:
-    
-    pass
-
-def send_client_scrpts():
-
-    pass
-
+import rpyc
 
 def main():
     # Init global paramter
-    global_config = GlobalConfig()
+    config = LocalConfig()
 
-    device = torch.device("cuda" if global_config.use_cuda else "cpu")
-    kwargs = {'num_workers': 1,
-              'pin_memory': True} if global_config.use_cuda else {}
+    device = torch.device("cuda" if config.common.use_cuda else "cpu")
+    kwargs = {'num_workers': 1, 'pin_memory': True} if config.common.use_cuda else {}
 
-    if global_config.training_structure == 'local':
-        config = LocalTrainingConfig()
+    if config.common.training_structure == 'local':
+        config = LocalConfig()
 
     """Create model, dataset, etc
 
@@ -86,6 +45,8 @@ def main():
         global_config.dataset_type)
     test_loader = fl_utils.create_server_test_loader(
         global_config, kwargs, test_dataset)
+
+    training_client_list = get_client_list(config)
 
     # Training
     for epoch_idx in range(1, 1 + global_config.epoch):
@@ -103,3 +64,20 @@ def send_para():
 
 if __name__ == "__main__":
     main()
+
+
+def send_client_scrpts():
+
+    pass
+
+@singledispatch
+def get_client_list(config):
+    pass
+
+@get_client_list.register(LocalTrainingConfig)
+def _(config):
+        print("This is local")
+
+@get_client_list.register(RemoteTrainingConfig)
+def _(config):
+        print("This is remote")

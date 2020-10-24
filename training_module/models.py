@@ -1,22 +1,7 @@
 __author__ = 'yang.xu'
 
-import os
-import time
-import math
-import numpy as np
-import numpy.ma as ma
-import random
-import re
-#import matplotlib.pyplot as plt
-
-import torch
 import torch.nn.functional as F
 import torch.nn as nn
-#from syft.frameworks.torch.nn import GRU, LSTM, RNN
-from torch.utils.data import TensorDataset, DataLoader
-
-#import syft as sy  # <--NEW: import the PySyft library
-
 
 # <--For Sent140
 '''
