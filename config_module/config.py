@@ -3,7 +3,7 @@ from dataclasses import (
     field
 )
 
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 
 
 @dataclass
@@ -21,7 +21,7 @@ class CommonConfig:
     test_batch_size: int = 1000
 
     # global_config.writer.add_scalar('Accuracy/test', np.random.random(), n_iter)
-    writer: SummaryWriter = SummaryWriter()
+    # writer: SummaryWriter = SummaryWriter()
 
 
 @dataclass

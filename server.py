@@ -1,6 +1,6 @@
 import torch
 import torchvision
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
@@ -15,11 +15,12 @@ from multiprocessing import (
 )
 import os
 import paramiko
+import asyncio
 
-import fl_utils
+# import fl_utils
 from config_module.config import *
 
-import rpyc
+
 
 def main():
     # Init global paramter
@@ -31,8 +32,12 @@ def main():
     if config.common.training_structure == 'local':
         config = LocalConfig()
 
+
+
     """Create model, dataset, etc
 
+
+    """
 
     """
 
@@ -57,6 +62,7 @@ def main():
     
     process_list = [Process(target=send_para, args=()) for _ in range(global_config.worker_num)]
 
+    """
 
 def send_para():
     pass
@@ -65,19 +71,3 @@ def send_para():
 if __name__ == "__main__":
     main()
 
-
-def send_client_scrpts():
-
-    pass
-
-@singledispatch
-def get_client_list(config):
-    pass
-
-@get_client_list.register(LocalTrainingConfig)
-def _(config):
-        print("This is local")
-
-@get_client_list.register(RemoteTrainingConfig)
-def _(config):
-        print("This is remote")

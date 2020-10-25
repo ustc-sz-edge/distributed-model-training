@@ -1,16 +1,20 @@
 import paramiko
+from functools import singledispatch
 
-from config_module.config import ClientConfig
+from config_module.config import *
 
 
 class Worker:
-    _ip_addr = ""
-    _port = ""
-    _key_path = ""
-    _auth_phrase = ""
+    __ip_addr = ""
+    __port = ""
+    __key_path = ""
+    __auth_phrase = ""
 
-    _local_script_path = "./client.py"
-    _remote_script_path = "~/client.py"
+    __local_script_path = "./client.py"
+    __remote_script_path = "~/client.py"
+
+    model = None
+    para = dict()
 
     def __init__(self,
                  config: ClientConfig,
@@ -18,24 +22,42 @@ class Worker:
                  port: int
                  ):
         self.config = config
+        self.work_thread = None
 
-        self.work_thread = ProcessLookupError
+        # Start remote process
+        while not self.__check_worker_script_exist():
+            self.__start_remote_worker_process()
+            break
+        else:
+            self.__send_scripts()
 
-    def _check_worker_script_exist(self):
-        if not len(self._local_script_path) is 0:
+    def __check_worker_script_exist(self):
+        if not len(self.__local_script_path) is 0:
             return True
         else:
             return False
 
-    def _sent_scripts(self):
+    def __send_scripts(self):
         pass
 
-    def start_remote_worker_process(self):
+    def __start_remote_worker_process(self):
 
         pass
 
-    def send_para(self, order: list = None):
+    @singledispatch
+    def get_client_list(self, config):
         pass
 
-    def get_para(self, state_enable=False):
+    @get_client_list.register(LocalConfig)
+    def _(self, config):
+        print("This is local")
+
+    @get_client_list.register(RemoteConfig)
+    def _(self, config):
+        print("This is remote")
+
+    def pull(self, order: list = None):
+        pass
+
+    def push(self, state_enable=False):
         pass

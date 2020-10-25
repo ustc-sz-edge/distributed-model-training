@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import Dataset
 # import syft as sy
 from torchvision import datasets, transforms
-import fl_utils
+
 
 class train_test_dataset():
     def __init__(self, data, targets, num_classes):
