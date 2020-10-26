@@ -1,38 +1,52 @@
-import torch
-import torchvision
 # from torch.utils.tensorboard import SummaryWriter
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-from torchvision import datasets, transforms
-import torch.distributed as dist
 
+import asyncio
+import socket
+import pickle
 from functools import singledispatch
-import numpy as np
-from multiprocessing import (
-    Process,
-    Pool
-)
-import os
-import paramiko
 import asyncio
 
-# import fl_utils
-from config_module.config import *
+from config import *
+from communication_module.comm_utils import *
 
+
+def recv_basic(conn):
+    total_data = b''
+    while True:
+        data = conn.recv(20480)
+        if not data: break
+        total_data = total_data + data
+    return total_data
 
 
 def main():
-    # Init global paramter
-    config = LocalConfig()
+    # Init global parameter
+    config = RemoteConfig()
+    assert config.common.worker_num == len(WORKER_IP_LIST)
 
-    device = torch.device("cuda" if config.common.use_cuda else "cpu")
-    kwargs = {'num_workers': 1, 'pin_memory': True} if config.common.use_cuda else {}
+    for worker_idx in range(config.common.worker_num):
+        config.work_list.append(
+            Worker(config=ClientConfig(worker_idx, socket.gethostname(), action=Action.LOCAL_TRAINING),
+                   ip_addr="localhost",
+                   master_port=config.common.master_listen_port_base + worker_idx,
+                   client_port=config.common.client_listen_port_base + worker_idx
+                   )
+        )
 
-    if config.common.training_structure == 'local':
-        config = LocalConfig()
+    model = 1
 
+    # device = torch.device("cuda" if config.common.use_cuda else "cpu")
+    # kwargs = {'num_workers': 1, 'pin_memory': True} if config.common.use_cuda else {}
+    loop = asyncio.get_event_loop()
+    while True:
+        tasks = []
+        for worker in config.work_list:
+            tasks.append(worker.send_client_state())
+        loop.run_until_complete(asyncio.wait(tasks))
 
+        for task in tasks:
+            print(task.result())
+    loop.close()
 
     """Create model, dataset, etc
 
@@ -64,10 +78,10 @@ def main():
 
     """
 
+
 def send_para():
     pass
 
 
 if __name__ == "__main__":
     main()
-

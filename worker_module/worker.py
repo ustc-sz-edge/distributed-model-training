@@ -1,28 +1,28 @@
-import paramiko
-from functools import singledispatch
 
-from config_module.config import *
 
+from config import ClientConfig, ClientState
+from communication_module.comm_utils import *
 
 class Worker:
-    __ip_addr = ""
-    __port = ""
-    __key_path = ""
-    __auth_phrase = ""
+    ip_addr = ""
+    listen_port = 0
+    master_port = 0
 
     __local_script_path = "./client.py"
     __remote_script_path = "~/client.py"
 
-    model = None
-    para = dict()
-
     def __init__(self,
-                 config: ClientConfig,
-                 ip_addr: str,
-                 port: int
+                 config,
+                 ip_addr,
+                 master_port,
+                 client_port
                  ):
         self.config = config
         self.work_thread = None
+        self.idx = config.idx
+        self.ip_addr = ip_addr
+        self.listen_port = client_port
+        self.master_port = master_port
 
         # Start remote process
         while not self.__check_worker_script_exist():
@@ -44,20 +44,12 @@ class Worker:
 
         pass
 
-    @singledispatch
-    def get_client_list(self, config):
-        pass
+    def send_client_state(self):
+        return asyncio.ensure_future(send_worker_state(self.config, self.ip_addr, self.listen_port))
 
-    @get_client_list.register(LocalConfig)
-    def _(self, config):
-        print("This is local")
+    def get_client_state(self):
+        return asyncio.ensure_future(get_worker_state(listen_port=self.master_port))
 
-    @get_client_list.register(RemoteConfig)
-    def _(self, config):
-        print("This is remote")
 
-    def pull(self, order: list = None):
-        pass
 
-    def push(self, state_enable=False):
-        pass
+

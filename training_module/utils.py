@@ -16,7 +16,7 @@ from torch.utils.data import TensorDataset, DataLoader
 
 #import syft as sy  # <--NEW: import the PySyft library
 
-import fl_datasets
+import training_module.datasets
 
 # <--NEW: hook PyTorch ie add extra functionalities to support Federated Learning
 #hook = sy.TorchHook(torch)
@@ -90,8 +90,8 @@ def create_bias_loader(args, kwargs, is_train, dataset, selected_idxs):
         if not args.train_flag:
             print('--[Debug] vm:{}-data len:{}'.format(vm_idx, data_len))
 
-        data_transform = fl_datasets.load_default_transform(args.dataset_type)
-        vm_dataset_instance = fl_datasets.VMDataset(
+        data_transform = datasets.load_default_transform(args.dataset_type)
+        vm_dataset_instance = datasets.VMDataset(
             selected_data, selected_targets, data_transform)
 
         if is_train:
@@ -118,8 +118,8 @@ def create_bias_federated_loader(args, kwargs, vm_list, is_train, dataset, selec
         if not args.train_flag:
             print('--[Debug] vm:{}-data len:{}'.format(vm_idx, data_len))
 
-        data_transform = fl_datasets.load_default_transform(args.dataset_type)
-        vm_dataset_instance = fl_datasets.VMDataset(
+        data_transform = datasets.load_default_transform(args.dataset_type)
+        vm_dataset_instance = datasets.VMDataset(
             selected_data, selected_targets, data_transform).federate([vm_list[vm_idx]])
 
         if is_train:
@@ -141,8 +141,8 @@ def create_bias_federated_loader(args, kwargs, vm_list, is_train, dataset, selec
         selected_data, selected_targets = create_bias_selected_data(args, selected_idxs[int(vm_idx/2)], dataset)
         data_len = len(selected_data)
         print('--[Debug] vm:{}-data len:{}'.format(vm_idx, data_len))
-        data_transform = fl_datasets.load_default_transform(args.dataset_type)
-        vm_dataset_instance = fl_datasets.VMDataset(selected_data, selected_targets, data_transform).federate([vm_list[vm_idx]])
+        data_transform = datasets.load_default_transform(args.dataset_type)
+        vm_dataset_instance = datasets.VMDataset(selected_data, selected_targets, data_transform).federate([vm_list[vm_idx]])
         if is_train:
             vm_loader_instance = sy.FederatedDataLoader( #<--this is now a FederatedDataLoader 
                                  vm_dataset_instance, shuffle = True, batch_size = args.batch_size, **kwargs)
@@ -153,8 +153,8 @@ def create_bias_federated_loader(args, kwargs, vm_list, is_train, dataset, selec
         vm_loaders.append(vm_loader_instance)
 
         print('--[Debug] vm:{}-data len:{}'.format(vm_idx + 1, data_len))
-        data_transform = fl_datasets.load_customized_transform(args.dataset_type)
-        vm_dataset_instance = fl_datasets.VMDataset(selected_data, selected_targets, data_transform).federate([vm_list[vm_idx + 1]])
+        data_transform = datasets.load_customized_transform(args.dataset_type)
+        vm_dataset_instance = datasets.VMDataset(selected_data, selected_targets, data_transform).federate([vm_list[vm_idx + 1]])
         if is_train:
             vm_loader_instance = sy.FederatedDataLoader( #<--this is now a FederatedDataLoader 
                                  vm_dataset_instance, shuffle = True, batch_size = args.batch_size, **kwargs)
@@ -269,9 +269,9 @@ def create_random_loader(args, kwargs, tx2_idx, num_data, is_train, dataset):
 
     #print('--[Debug] tx2:{}-piece len:{}'.format(tx2_idx, len(selected_targets)))
 
-    data_transform = fl_datasets.load_default_transform(args.dataset_type)
+    data_transform = datasets.load_default_transform(args.dataset_type)
 
-    vm_dataset_instance = fl_datasets.VMDataset(selected_data, selected_targets, data_transform)
+    vm_dataset_instance = datasets.VMDataset(selected_data, selected_targets, data_transform)
     if is_train:
         vm_loader = DataLoader(  # <--this is now a DataLoader
             vm_dataset_instance, shuffle=True, batch_size=args.batch_size, **kwargs)
@@ -302,9 +302,9 @@ def create_segment_loader(args, kwargs, num_tx2, tx2_idx, is_train, dataset):
 
     print('--[Debug] tx2:{}-piece len:{}'.format(tx2_idx, len(selected_targets)))
 
-    data_transform = fl_datasets.load_default_transform(args.dataset_type)
+    data_transform = datasets.load_default_transform(args.dataset_type)
 
-    vm_dataset_instance = fl_datasets.VMDataset(selected_data, selected_targets, data_transform)
+    vm_dataset_instance = datasets.VMDataset(selected_data, selected_targets, data_transform)
     if is_train:
         vm_loader = DataLoader(  # <--this is now a DataLoader
             vm_dataset_instance, shuffle=True, batch_size=args.batch_size, **kwargs)
@@ -336,9 +336,9 @@ def create_segment_federated_loader(args, kwargs, vm_list, is_train, dataset):
 
         print('--[Debug] vm:{}-piece len:{}'.format(vm_idx, len(selected_targets)))
 
-        data_transform = fl_datasets.load_default_transform(args.dataset_type)
+        data_transform = datasets.load_default_transform(args.dataset_type)
 
-        vm_dataset_instance = fl_datasets.VMDataset(
+        vm_dataset_instance = datasets.VMDataset(
             selected_data, selected_targets, data_transform).federate([vm_list[vm_idx]])
         if is_train:
             vm_loader_instance = sy.FederatedDataLoader(  # <--this is now a FederatedDataLoader
@@ -381,9 +381,9 @@ def create_labelwise_federated_loader(args, kwargs, vm_list, is_train, dataset, 
             args, label_wise_data, label_wise_targets)
         print('--[Debug] vm:{}-data len:{}'.format(vm_idx, len(selected_data)))
 
-        data_transform = fl_datasets.load_default_transform(args.dataset_type)
+        data_transform = datasets.load_default_transform(args.dataset_type)
 
-        vm_dataset_instance = fl_datasets.VMDataset(
+        vm_dataset_instance = datasets.VMDataset(
             selected_data, selected_targets, data_transform).federate([vm_list[vm_idx]])
 
         if is_train:
@@ -424,9 +424,9 @@ def create_server_test_loader(args, kwargs, test_dataset):
         test_dataset.data = np.transpose(
                 test_dataset.data, (0, 3, 1, 2))  # <--for CIFAR10 & CIFAR100
 
-    data_transform = fl_datasets.load_default_transform(args.dataset_type)
+    data_transform = datasets.load_default_transform(args.dataset_type)
 
-    vm_dataset_instance = fl_datasets.VMDataset(np.float32(test_dataset.data), np.int64(
+    vm_dataset_instance = datasets.VMDataset(np.float32(test_dataset.data), np.int64(
         test_dataset.targets), data_transform)
 
     test_loader = DataLoader(  # <--this is now a FederatedDataLoader
@@ -445,9 +445,9 @@ def create_ps_test_loader(args, kwargs, vm_instance, test_dataset):
         test_dataset.data = np.transpose(
                 test_dataset.data, (0, 3, 1, 2))  # <--for CIFAR10 & CIFAR100
 
-    data_transform = fl_datasets.load_default_transform(args.dataset_type)
+    data_transform = datasets.load_default_transform(args.dataset_type)
 
-    vm_dataset_instance = fl_datasets.VMDataset(np.float32(test_dataset.data), np.int64(
+    vm_dataset_instance = datasets.VMDataset(np.float32(test_dataset.data), np.int64(
         test_dataset.targets), data_transform).federate([vm_instance])
 
     test_loader = sy.FederatedDataLoader(  # <--this is now a FederatedDataLoader
@@ -470,9 +470,9 @@ def create_centralized_train_test_loader(args, kwargs, vm_instance, vm_dataset, 
     if args.dataset_type == 'FashionMNIST':
         data_transform = None
     else:
-        data_transform = fl_datasets.load_default_transform(args.dataset_type)
+        data_transform = datasets.load_default_transform(args.dataset_type)
 
-    vm_dataset_instance = fl_datasets.VMDataset(np.float32(vm_dataset.data), np.int64(
+    vm_dataset_instance = datasets.VMDataset(np.float32(vm_dataset.data), np.int64(
         vm_dataset.targets), data_transform).federate([vm_instance])
 
     if is_test:
