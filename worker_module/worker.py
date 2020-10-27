@@ -1,6 +1,5 @@
 
 
-from config import ClientConfig, ClientState
 from communication_module.comm_utils import *
 
 class Worker:
@@ -44,11 +43,17 @@ class Worker:
 
         pass
 
-    def send_client_state(self):
-        return asyncio.ensure_future(send_worker_state(self.config, self.ip_addr, self.listen_port))
+    def send_state(self):
+        return send_worker_state(self.config, self.ip_addr, self.listen_port)
 
-    def get_client_state(self):
-        return asyncio.ensure_future(get_worker_state(listen_port=self.master_port))
+    def get_state(self):
+        return get_worker_state(listen_port=self.master_port)
+
+    async def local_training(self):
+        self.config.action = Action.LOCAL_TRAINING
+        await self.send_state()
+        recv_config = await self.get_state()
+        self.config.state = recv_config.state
 
 
 

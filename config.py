@@ -6,10 +6,10 @@ from typing import List
 
 from worker_module.worker import Worker
 
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 
 WORKER_IP_LIST = [
-    "local_host"
+    "192.168.1.104"
 ]
 
 
@@ -24,7 +24,7 @@ class CommonConfig:
     use_cuda: bool = True
     training_structure: str = 'local'
 
-    worker_num: int = 10
+    worker_num: int = 1
 
     epoch_start: int = 0
     epoch = 0
@@ -36,7 +36,7 @@ class CommonConfig:
     # master_listen_port_for_client<idx> = master_listen_port_base + <client_idx>
 
     # global_config.writer.add_scalar('Accuracy/test', np.random.random(), n_iter)
-    writer: SummaryWriter = SummaryWriter()
+    # writer: SummaryWriter = SummaryWriter()
 
 
 @dataclass()
@@ -44,6 +44,7 @@ class ClientState:
     model: dict = field(default_factory=dict)
     para: dict = field(default_factory=dict)
     resource: dict = field(default_factory=dict)
+    custom: dict = field(default_factory=dict)
     acc: int = 0
     loss: int = 1
     running_time: int = 0

@@ -14,7 +14,8 @@ def recv_basic(conn):
     total_data = b''
     while True:
         data = conn.recv(20480)
-        if not data: break
+        if not data:
+            break
         total_data = total_data + data
     return total_data
 
@@ -27,7 +28,7 @@ def main():
     for worker_idx in range(config.common.worker_num):
         config.work_list.append(
             Worker(config=ClientConfig(worker_idx, socket.gethostname(), action=Action.LOCAL_TRAINING),
-                   ip_addr="localhost",
+                   ip_addr=WORKER_IP_LIST[worker_idx],
                    master_port=config.common.master_listen_port_base + worker_idx,
                    client_port=config.common.client_listen_port_base + worker_idx
                    )
@@ -41,7 +42,7 @@ def main():
     while True:
         tasks = []
         for worker in config.work_list:
-            tasks.append(worker.send_client_state())
+            tasks.append(loop.create_task(worker.get_state()))
         loop.run_until_complete(asyncio.wait(tasks))
 
         for task in tasks:
