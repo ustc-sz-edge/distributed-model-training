@@ -1,87 +1,77 @@
 # from torch.utils.tensorboard import SummaryWriter
 
 import asyncio
+import functools
 import socket
 import pickle
 from functools import singledispatch
 import asyncio
 
+import torch
+
 from config import *
 from communication_module.comm_utils import *
+from training_module import datasets, models, utils
 
 
-def recv_basic(conn):
-    total_data = b''
-    while True:
-        data = conn.recv(20480)
-        if not data:
-            break
-        total_data = total_data + data
-    return total_data
+def recode_state(paras, result):
+    if paras[1] is None:
+        pass
+    else:
+        paras[0].add_scalar('Accuracy/worker_' + str(paras[1].config.idx), paras[1].config.acc,
+                            paras[1].config.epoch_num)
 
 
 def main():
     # Init global parameter
-    config = RemoteConfig()
-    assert config.common.worker_num == len(WORKER_IP_LIST)
-
-    for worker_idx in range(config.common.worker_num):
-        config.work_list.append(
-            Worker(config=ClientConfig(worker_idx, socket.gethostname(), action=Action.LOCAL_TRAINING),
+    common_config = CommonConfig()
+    assert common_config.worker_num >= len(WORKER_IP_LIST)
+    for worker_idx in range(common_config.worker_num):
+        common_config.worker_list.append(
+            Worker(config=ClientConfig(idx=worker_idx,
+                                       master_ip_addr=socket.gethostbyname(socket.gethostname()),
+                                       action=ClientAction.LOCAL_TRAINING),
                    ip_addr=WORKER_IP_LIST[worker_idx],
-                   master_port=config.common.master_listen_port_base + worker_idx,
-                   client_port=config.common.client_listen_port_base + worker_idx
+                   master_port=common_config.master_listen_port_base + worker_idx,
+                   client_port=common_config.client_listen_port_base + worker_idx
                    )
         )
 
-    model = 1
-
-    # device = torch.device("cuda" if config.common.use_cuda else "cpu")
-    # kwargs = {'num_workers': 1, 'pin_memory': True} if config.common.use_cuda else {}
-    loop = asyncio.get_event_loop()
-    while True:
-        tasks = []
-        for worker in config.work_list:
-            tasks.append(loop.create_task(worker.get_state()))
-        loop.run_until_complete(asyncio.wait(tasks))
-
-        for task in tasks:
-            print(task.result())
-    loop.close()
+    device = torch.device("cuda" if common_config.use_cuda else "cpu")
+    kwargs = {'num_workers': 1, 'pin_memory': True} if common_config.use_cuda else {}
 
     """Create model, dataset, etc
 
 
-    """
-
-    """
-
+        """
     # Create federated model instance
-    model = fl_models.create_model_instance(
-        global_config.dataset_type, global_config.model_type, device)
+    global_model = models.create_model_instance(
+        common_config.dataset_type, common_config.model_type, device)
 
     # Create dataset instance
-    train_dataset, test_dataset = fl_datasets.load_datasets(
-        global_config.dataset_type)
-    test_loader = fl_utils.create_server_test_loader(
-        global_config, kwargs, test_dataset)
+    train_dataset, test_dataset = datasets.load_datasets(
+        common_config.dataset_type)
+    test_loader = utils.create_server_test_loader(
+        common_config, kwargs, test_dataset)
 
-    training_client_list = get_client_list(config)
+    # if not args.epoch_start == 0:
+    #     global_model.load_state_dict(torch.load(LOAD_MODEL_PATH))
 
-    # Training
-    for epoch_idx in range(1, 1 + global_config.epoch):
-        
-        pass
+    global_para = global_model.named_parameters()
+    for worker in common_config.worker_list:
+        worker.config.model = models.Net2Tuple(global_model)
+        worker.config.para = global_para
 
+    loop = asyncio.get_event_loop()
+    for epoch_idx in range(1, 1 + common_config.epoch):
+        tasks = []
+        for worker in common_config.worker_list:
+            task = asyncio.ensure_future(worker.local_training())
+            task.add_done_callback(functools.partial(recode_state, (common_config.recoder, worker)))
+            tasks.append(task)
+        loop.run_until_complete(asyncio.wait(tasks))
 
-    
-    process_list = [Process(target=send_para, args=()) for _ in range(global_config.worker_num)]
-
-    """
-
-
-def send_para():
-    pass
+    loop.close()
 
 
 if __name__ == "__main__":

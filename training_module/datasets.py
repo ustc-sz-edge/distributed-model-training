@@ -91,24 +91,24 @@ def load_datasets(dataset_type):
     test_dataset = []
     
     if dataset_type == 'CIFAR10':
-        train_dataset = datasets.CIFAR10('./data', train = True, download = True, transform = None)
+        train_dataset = datasets.CIFAR10('../data', train = True, download = True, transform = None)
 
-        test_dataset = datasets.CIFAR10('./data', train = False, transform = None)
+        test_dataset = datasets.CIFAR10('../data', train = False, transform = None)
 
     elif dataset_type == 'CIFAR100':
-        train_dataset = datasets.CIFAR100('./data', train = True, download = True, transform = None)
+        train_dataset = datasets.CIFAR100('../data', train = True, download = True, transform = None)
         
-        test_dataset = datasets.CIFAR100('./data', train = False, transform = None)
+        test_dataset = datasets.CIFAR100('../data', train = False, transform = None)
 
     elif dataset_type == 'FashionMNIST':
-        train_dataset = datasets.FashionMNIST('./data', train = True, download = True, transform = None)
+        train_dataset = datasets.FashionMNIST('../data', train = True, download = True, transform = None)
     
-        test_dataset = datasets.FashionMNIST('./data', train = False, transform = None)
+        test_dataset = datasets.FashionMNIST('../data', train = False, transform = None)
     
     elif dataset_type == 'MNIST':
-        train_dataset = datasets.MNIST('./data', train = True, download = True, transform = None)
+        train_dataset = datasets.MNIST('../data', train = True, download = True, transform = None)
     
-        test_dataset = datasets.MNIST('./data', train = False, transform = None)
+        test_dataset = datasets.MNIST('../data', train = False, transform = None)
                        
     return train_dataset, test_dataset
 

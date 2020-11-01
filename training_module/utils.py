@@ -16,7 +16,7 @@ from torch.utils.data import TensorDataset, DataLoader
 
 #import syft as sy  # <--NEW: import the PySyft library
 
-import training_module.datasets
+from training_module import datasets
 
 # <--NEW: hook PyTorch ie add extra functionalities to support Federated Learning
 #hook = sy.TorchHook(torch)
