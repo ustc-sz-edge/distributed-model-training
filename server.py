@@ -68,16 +68,24 @@ def main():
     #     worker.config.para = global_para
 
     action_queue = Queue()
+
+    # Or you can add all action ad once
     action_queue.put(ServerAction.LOCAL_TRAINING)
+
     for epoch_idx in range(1, 1 + common_config.epoch):
-        ServerAction().execute_action(action_queue.get())
+        # Execute action
+        ServerAction().execute_action(action_queue.get(), common_config.worker_list)
+
+        # Add next action, may be conditionally
         action_queue.put(ServerAction.LOCAL_TRAINING)
 
-        # Methods you want to do every epoch
+        # Do somethings for recoder
 
         for worker in common_config.worker_list:
             common_config.recoder.add_scalar('Accuracy/worker_' + str(worker.config.idx), worker.config.acc,
                                              worker.config.epoch_num)
+
+        # Do something for global model
 
 
 if __name__ == "__main__":

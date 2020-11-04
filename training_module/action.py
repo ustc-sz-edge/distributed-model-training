@@ -5,9 +5,9 @@ import functools
 class ServerAction:
     LOCAL_TRAINING = "local_training"
 
-    def execute_action(self, action):
+    def execute_action(self, action, worker_list):
         if action == self.LOCAL_TRAINING:
-            self.local_training()
+            self.local_training(worker_list)
 
     @staticmethod
     def send_states(worker_list):
