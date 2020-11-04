@@ -6,12 +6,14 @@ import socket
 import pickle
 from functools import singledispatch
 import asyncio
+from queue import Queue
 
 import torch
 
 from config import *
 from communication_module.comm_utils import *
 from training_module import datasets, models, utils
+from training_module.action import ServerAction
 
 
 def recode_state(paras, result):
@@ -57,21 +59,25 @@ def main():
     # if not args.epoch_start == 0:
     #     global_model.load_state_dict(torch.load(LOAD_MODEL_PATH))
 
-    global_para = global_model.named_parameters()
-    for worker in common_config.worker_list:
-        worker.config.model = models.Net2Tuple(global_model)
-        worker.config.para = global_para
+    # TODO: Add thread to listen new client
 
-    loop = asyncio.get_event_loop()
+    global_para = dict(global_model.named_parameters())
+
+    # for worker in common_config.worker_list:
+    #     worker.config.model = models.Net2Tuple(global_model)
+    #     worker.config.para = global_para
+
+    action_queue = Queue()
+    action_queue.put(ServerAction.LOCAL_TRAINING)
     for epoch_idx in range(1, 1 + common_config.epoch):
-        tasks = []
-        for worker in common_config.worker_list:
-            task = asyncio.ensure_future(worker.local_training())
-            task.add_done_callback(functools.partial(recode_state, (common_config.recoder, worker)))
-            tasks.append(task)
-        loop.run_until_complete(asyncio.wait(tasks))
+        ServerAction().execute_action(action_queue.get())
+        action_queue.put(ServerAction.LOCAL_TRAINING)
 
-    loop.close()
+        # Methods you want to do every epoch
+
+        for worker in common_config.worker_list:
+            common_config.recoder.add_scalar('Accuracy/worker_' + str(worker.config.idx), worker.config.acc,
+                                             worker.config.epoch_num)
 
 
 if __name__ == "__main__":

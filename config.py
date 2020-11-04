@@ -4,15 +4,11 @@ from torch.utils.tensorboard import SummaryWriter
 from communication_module.comm_utils import *
 
 WORKER_IP_LIST = [
-    "192.168.1.105"
+    "192.168.0.16"
 ]
 
 
 class ClientAction:
-    LOCAL_TRAINING = "local_training"
-
-
-class ServerAction:
     LOCAL_TRAINING = "local_training"
 
 
