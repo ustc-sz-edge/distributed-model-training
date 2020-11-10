@@ -4,7 +4,7 @@ from torch.utils.tensorboard import SummaryWriter
 from communication_module.comm_utils import *
 
 WORKER_IP_LIST = [
-    "192.168.0.16"
+    "192.168.1.105"
 ]
 
 
@@ -78,7 +78,7 @@ class CommonConfig:
         self.worker_num = 1
 
         self.epoch_start = 0
-        self.epoch = 50
+        self.epoch = 500
 
         self.test_batch_size = 64
 

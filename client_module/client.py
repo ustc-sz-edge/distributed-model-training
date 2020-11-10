@@ -23,6 +23,7 @@ MASTER_IP = args.master_ip
 LISTEN_PORT = args.listen_port
 MASTER_LISTEN_PORT = args.master_listen_port
 
+
 def main():
     client_config = ClientConfig(
         idx=args.idx,
@@ -30,13 +31,15 @@ def main():
         action=""
     )
 
+    model = None
 
     # Init dataset
-    train_dataset = None 
+    train_dataset = None
     test_dataset = None
-    
+
     while True:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         tasks = []
         tasks.append(
             asyncio.ensure_future(
@@ -49,18 +52,21 @@ def main():
             print(task.result())
         loop.close()
 
+
 async def local_training(config):
     config = await get_data(LISTEN_PORT)
     # Update model
+    config.acc = config.acc + 0.001
+    # model = MyNet(config.model)
+    # if config.para is not None:
+    #     model.load_state_dict(config.para)
 
-    model = MyNet(config.model)
-    if config.para is not None:
-        model.load_state_dict(config.para)
+    # config.
 
     # Do something for training
 
-
     await send_data(config, MASTER_IP, MASTER_LISTEN_PORT)
+
 
 if __name__ == '__main__':
     main()

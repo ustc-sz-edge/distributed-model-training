@@ -11,7 +11,8 @@ class ServerAction:
 
     @staticmethod
     def send_states(worker_list):
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         tasks = []
         for worker in worker_list:
             task = asyncio.ensure_future(worker.send_config())
@@ -21,7 +22,8 @@ class ServerAction:
 
     @staticmethod
     def get_states(worker_list):
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         tasks = []
         for worker in worker_list:
             task = asyncio.ensure_future(worker.get_config())
@@ -31,7 +33,8 @@ class ServerAction:
 
     @staticmethod
     def local_training(worker_list):
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         tasks = []
         for worker in worker_list:
             task = asyncio.ensure_future(worker.local_training())

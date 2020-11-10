@@ -83,7 +83,9 @@ def main():
 
         for worker in common_config.worker_list:
             common_config.recoder.add_scalar('Accuracy/worker_' + str(worker.config.idx), worker.config.acc,
-                                             worker.config.epoch_num)
+                                             epoch_idx)
+            print('Accuracy/worker_' + str(worker.config.idx) + str(worker.config.acc) + "Epoch" +
+                  str(epoch_idx))
 
         # Do something for global model
 
