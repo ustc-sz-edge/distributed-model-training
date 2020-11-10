@@ -39,7 +39,7 @@ def main():
                    )
         )
 
-    device = torch.device("cuda" if common_config.use_cuda else "cpu")
+    device = torch.device("cuda" if common_config.use_cuda and torch.cuda.is_available() else "cpu")
     kwargs = {'num_workers': 1, 'pin_memory': True} if common_config.use_cuda else {}
 
     """Create model, dataset, etc

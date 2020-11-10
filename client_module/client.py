@@ -10,7 +10,7 @@ from training_utils import MyNet
 parser = argparse.ArgumentParser(description='Distributed Client')
 parser.add_argument('--idx', type=str, default="0",
                     help='index of worker')
-parser.add_argument('--master_ip', type=str, default="192.168.1.104",
+parser.add_argument('--master_ip', type=str, default="127.0.0.1",
                     help='IP address for controller or ps')
 parser.add_argument('--listen_port', type=int, default=47000, metavar='N',
                     help='Port used to listen msg from master')
@@ -54,7 +54,7 @@ def main():
 
 
 async def local_training(config):
-    config = await get_data(LISTEN_PORT)
+    config = await get_data(LISTEN_PORT, MASTER_IP)
     # Update model
     config.acc = config.acc + 0.001
     # model = MyNet(config.model)

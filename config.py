@@ -4,7 +4,7 @@ from torch.utils.tensorboard import SummaryWriter
 from communication_module.comm_utils import *
 
 WORKER_IP_LIST = [
-    "192.168.1.105"
+    "127.0.0.1"
 ]
 
 
@@ -56,7 +56,7 @@ class Worker:
         return send_worker_state(self.config, self.ip_addr, self.listen_port)
 
     def get_config(self):
-        return get_worker_state(listen_port=self.master_port)
+        return get_worker_state(listen_port=self.master_port, listen_ip=self.ip_addr)
 
     async def local_training(self):
         self.config.action = ClientAction.LOCAL_TRAINING
