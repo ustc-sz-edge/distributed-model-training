@@ -16,7 +16,7 @@ from torch.utils.data import TensorDataset, DataLoader
 
 #import syft as sy  # <--NEW: import the PySyft library
 
-from training_module import datasets
+import datasets
 
 # <--NEW: hook PyTorch ie add extra functionalities to support Federated Learning
 #hook = sy.TorchHook(torch)
@@ -60,66 +60,6 @@ def create_vm(vm_num=2):
         vm_list.append(vm_instance)
     return vm_list
 
-
-class RandomPartitioner(object):
-
-    def __init__(self, data, sizes, transform=None, seed=2020):
-        self.data = data
-        self.transform = transform
-        self.partitions = []
-        rng = random.Random()
-        rng.seed(seed)
-
-        self.data.targets = np.array(self.data.targets)
-        self.data.data = np.array(self.data.data)
-
-        data_len = len(data)
-        indexes = [x for x in range(0, data_len)]
-        rng.shuffle(indexes)
-
-        for frac in sizes:
-            part_len = round(frac * data_len)
-            self.partitions.append(indexes[0:part_len])
-            indexes = indexes[part_len:]
-
-    def use(self, partition):
-        selected_idxs = self.partitions[partition]
-
-        return selected_idxs
-
-class LabelwisePartitioner(object):
-
-    def __init__(self, data, sizes, transform=None, seed=2020):
-        # sizes is a class_num * vm_num matrix
-        self.data = data
-        self.transform = transform
-        self.partitions = [list() for _ in range(len(sizes[0]))]
-        rng = random.Random()
-        rng.seed(seed)
-
-        self.data.targets = np.array(self.data.targets)
-        self.data.data = np.array(self.data.data)
-
-        label_indexes = list()
-        class_len = list()
-        # label_indexes includes class_num lists. Each list is the set of indexs of a specific class
-        for class_idx in range(len(data.classes)):
-            label_indexes.append(list(np.where(data.targets == class_idx)[0]))
-            class_len.append(len(label_indexes[class_idx]))
-            rng.shuffle(label_indexes[class_idx])
-        
-        # distribute class indexes to each vm according to sizes matrix
-        for class_idx in range(len(data.classes)):
-            begin_idx = 0
-            for vm_idx, frac in enumerate(sizes[class_idx]):
-                end_idx = begin_idx + round(frac * class_len[class_idx])
-                self.partitions[vm_idx].extend(label_indexes[class_idx][begin_idx:end_idx])
-                begin_idx = end_idx
-
-    def use(self, partition):
-        selected_idxs = self.partitions[partition]
-
-        return selected_idxs
 
 def create_bias_selected_data(args, selected_idxs, dataset):
 
@@ -345,11 +285,11 @@ def create_random_loader(args, kwargs, tx2_idx, num_data, is_train, dataset):
 # and create federated train/test dataloader
 def create_segment_loader(args, kwargs, num_tx2, tx2_idx, is_train, dataset):
     data_len = len(dataset.targets)
+    # print(data_len)
     #data_len = len(train_targets_array)
     inter_num = np.int32(np.floor(data_len / num_tx2))
-    tx2_idx = tx2_idx - 1
     begin_idx = tx2_idx * inter_num
-    if tx2_idx != num_tx2 - 1:
+    if tx2_idx != num_tx2:
         end_idx = (tx2_idx + 1) * inter_num
     else:
         end_idx = data_len
@@ -365,12 +305,13 @@ def create_segment_loader(args, kwargs, num_tx2, tx2_idx, is_train, dataset):
     data_transform = datasets.load_default_transform(args.dataset_type)
 
     vm_dataset_instance = datasets.VMDataset(selected_data, selected_targets, data_transform)
+    # print(len(vm_dataset_instance))
     if is_train:
         vm_loader = DataLoader(  # <--this is now a DataLoader
             vm_dataset_instance, shuffle=True, batch_size=args.batch_size, **kwargs)
     else:
         vm_loader = DataLoader(  # <--this is now a DataLoader
-            vm_dataset_instance, shuffle=False, batch_size=args.test_batch_size, **kwargs)
+            vm_dataset_instance, shuffle=False, batch_size=args.batch_size, **kwargs)
 
     return vm_loader
 
@@ -486,8 +427,8 @@ def create_server_test_loader(args, kwargs, test_dataset):
 
     data_transform = datasets.load_default_transform(args.dataset_type)
 
-    vm_dataset_instance = datasets.VMDataset(test_dataset.data, 
-        test_dataset.targets, data_transform)
+    vm_dataset_instance = datasets.VMDataset(np.float32(test_dataset.data), np.int64(
+        test_dataset.targets), data_transform)
 
     test_loader = DataLoader(  # <--this is now a FederatedDataLoader
         vm_dataset_instance, shuffle=False, batch_size=args.test_batch_size, **kwargs)

@@ -8,7 +8,9 @@ from functools import singledispatch
 import asyncio
 from queue import Queue
 
+import numpy as np
 import torch
+import torch.nn.functional as F
 
 from config import *
 from communication_module.comm_utils import *
@@ -39,7 +41,7 @@ def main():
                    )
         )
 
-    device = torch.device("cuda" if common_config.use_cuda else "cpu")
+    device = torch.device("cuda" if common_config.use_cuda and torch.cuda.is_available() else "cpu")
     kwargs = {'num_workers': 1, 'pin_memory': True} if common_config.use_cuda else {}
 
     """Create model, dataset, etc
@@ -49,12 +51,21 @@ def main():
     # Create federated model instance
     global_model = models.create_model_instance(
         common_config.dataset_type, common_config.model_type, device)
+    # print("init", list(global_model.named_parameters()))
+
+    # print(models.Net2Tuple(global_model))
+    for idx, worker in enumerate(common_config.worker_list):
+            worker.config.para = dict(global_model.named_parameters())
+            worker.config.model = models.Net2Tuple(global_model)
 
     # Create dataset instance
     train_dataset, test_dataset = datasets.load_datasets(
         common_config.dataset_type)
-    test_loader = utils.create_server_test_loader(
-        common_config, kwargs, test_dataset)
+    # test_loader = utils.create_server_test_loader(
+    #     common_config, kwargs, test_dataset)
+    is_train = False
+    test_loader = utils.create_segment_loader(
+            common_config, kwargs, 1, 1, is_train, test_dataset)
 
     # if not args.epoch_start == 0:
     #     global_model.load_state_dict(torch.load(LOAD_MODEL_PATH))
@@ -88,6 +99,51 @@ def main():
                   str(epoch_idx))
 
         # Do something for global model
+        workers_para = dict()
+        vm_weight = 1.0 / len(common_config.worker_list)
+        # print("before", common_config.worker_list[0].config.para)
+        for idx, worker in enumerate(common_config.worker_list):
+            if idx == 0:
+                for key, values in worker.config.para.items():
+                    # print(values)
+                    workers_para[key] = values * vm_weight
+            else:
+                for key, values in worker.config.para.items():
+                    workers_para[key] += values * vm_weight
+        # print("worker", workers_para)
+        global_model.load_state_dict(workers_para)
+        # print("global", list(global_model.named_parameters()))
+
+        global_model.eval()
+        test_loss = 0.0
+        correct = 0
+
+        with torch.no_grad():
+            for data, target in test_loader:
+                data, target = data.to(device), target.to(device)
+
+                if common_config.dataset_type == 'FashionMNIST' or common_config.dataset_type == 'MNIST':
+                    if common_config.model_type == 'LR':
+                        data = data.squeeze(1) 
+                        data = data.view(-1, 28 * 28)
+                
+                output = global_model(data)
+                test_loss += F.nll_loss(output, target, reduction='sum').item()
+                pred = output.argmax(1, keepdim=True)
+                batch_correct = pred.eq(target.view_as(pred)).sum().item()
+
+                correct += batch_correct
+
+        test_loss /= len(test_loader.dataset)
+        test_accuracy = np.float(1.0 * correct / len(test_loader.dataset))
+
+        print('Test set: Epoch: {} Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+            epoch_idx, test_loss, correct, len(test_loader.dataset), 100. * test_accuracy))
+
+        
+        for idx, worker in enumerate(common_config.worker_list):
+            worker.config.para = dict(global_model.named_parameters())
+            worker.config.model = models.Net2Tuple(global_model)
 
 
 if __name__ == "__main__":
