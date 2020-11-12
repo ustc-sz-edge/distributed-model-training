@@ -1,3 +1,5 @@
+import sys
+import time
 import socket
 import pickle
 import argparse
@@ -10,12 +12,16 @@ import numpy as np
 from config import ClientConfig
 from client_comm_utils import *
 from training_utils import MyNet, train, test
-import datasets, models, utils
+import datasets, models
+import utils
+
+# sys.path.insert(0, '..')
+# import training_module.utils as utils
 
 parser = argparse.ArgumentParser(description='Distributed Client')
 parser.add_argument('--idx', type=str, default="0",
                     help='index of worker')
-parser.add_argument('--master_ip', type=str, default="127.0.0.1",
+parser.add_argument('--master_ip', type=str, default="192.168.1.100",
                     help='IP address for controller or ps')
 parser.add_argument('--listen_port', type=int, default=47000, metavar='N',
                     help='Port used to listen msg from master')
@@ -28,9 +34,9 @@ parser.add_argument('--decay_rate', type=float, default=0.98)
 parser.add_argument('--local_iters', type=int, default=1)
 parser.add_argument('--log_interval', type=int, default=100)
 parser.add_argument('--enable_vm_test', action="store_true", default=True)
-parser.add_argument('--no_cuda', action="store_false", default=False)
-parser.add_argument('--dataset_type', type=str, default='MNIST')
-parser.add_argument('--model_type', type=str, default='LR')
+parser.add_argument('--use_cuda', action="store_false", default=True)
+parser.add_argument('--dataset_type', type=str, default='CIFAR10')
+parser.add_argument('--model_type', type=str, default='AlexNet')
 parser.add_argument('--pattern_idx', type=int, default=0)
 parser.add_argument('--tx_num', type=int, default=1)
 
@@ -39,7 +45,9 @@ args = parser.parse_args()
 MASTER_IP = args.master_ip
 LISTEN_PORT = args.listen_port
 MASTER_LISTEN_PORT = args.master_listen_port
+LOCAL_IP = "192.168.1." + str(11+int(args.idx))
 
+device = torch.device("cuda" if args.use_cuda and torch.cuda.is_available() else "cpu")
 
 def main():
     client_config = ClientConfig(
@@ -47,12 +55,19 @@ def main():
         master_ip_addr=args.master_ip,
         action=""
     )
+    print("start")
+    
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    tasks = []
+    task = asyncio.ensure_future(get_init_config(client_config))
+    tasks.append(task)
+    loop.run_until_complete(asyncio.wait(tasks))
+    loop.close()
 
-    # model = None
-
-    # Init dataset
-    # train_dataset = None
-    # test_dataset = None
+    train_dataset, test_dataset = datasets.load_datasets(client_config.custom["dataset_type"])
+    train_loader = utils.create_dataloaders(train_dataset, batch_size=args.batch_size, selected_idxs=client_config.custom["train_data_idxes"])
+    test_loader = utils.create_dataloaders(test_dataset, batch_size=128, selected_idxs=client_config.custom["test_data_idxes"], shuffle=False)
 
     while True:
         loop = asyncio.new_event_loop()
@@ -60,62 +75,42 @@ def main():
         tasks = []
         tasks.append(
             asyncio.ensure_future(
-                local_training(client_config)
+                local_training(client_config, train_loader, test_loader)
             )
         )
         loop.run_until_complete(asyncio.wait(tasks))
 
-        for task in tasks:
-            print(task.result())
         loop.close()
 
 
-async def local_training(config):
-    config = await get_data(LISTEN_PORT, MASTER_IP)
-    # print(config.para)
-
-    use_cuda = not args.no_cuda and torch.cuda.is_available()
-    device = torch.device("cuda" if use_cuda else "cpu")
-    kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
-
-    LOG_ROOT_PATH = '/data/test/'
-    utils.create_dir(LOG_ROOT_PATH)
-    LOG_PATH = LOG_ROOT_PATH + 'model_acc_loss.txt'
-    log_out = open(LOG_PATH, 'w+')
-
-    # Update model
-    # print(config.model)
+async def local_training(config, train_loader, test_loader):
     model = MyNet(config.model)
 
-    if config.para is not None:
-        model.load_state_dict(config.para)
-    # print("loaded", list(model.named_parameters()))
-    args.lr = np.max((args.decay_rate ** (config.epoch_num - 1) * args.lr, args.min_lr))
-    optimizer = optim.SGD(model.parameters(), lr=args.lr)
-    tx2_train_loader, tx2_test_loader = create_dataloaders(args, kwargs, config)
-    train(args, config, model, device, tx2_train_loader, tx2_test_loader, optimizer, config.epoch_num, log_out)
+    model.load_state_dict(config.para)
+    model = model.to(device)
     
+    optimizer = optim.SGD(model.parameters(), lr=0.1)
+    test_acc = train(args, config, model, device, train_loader, test_loader, optimizer, config.epoch_num)
+    
+    config.acc = test_acc 
     config.model = models.Net2Tuple(model)
     config.para = dict(model.named_parameters())
-    # print("trained", config.para)
 
+    print("before send")
     await send_data(config, MASTER_IP, MASTER_LISTEN_PORT)
+    print("after send")
+    config_received = await get_data(LISTEN_PORT, LOCAL_IP)
 
-def create_dataloaders(args, kwargs, config):
-    # <--Load datasets
-    train_dataset, test_dataset = datasets.load_datasets(args.dataset_type)
+    for k, v in config_received.__dict__.items():
+        setattr(config, k, v)
 
-    # <--Create federated train/test loaders
-    if args.pattern_idx == 0:  # random data (IID)
-        is_train = True
-        tx2_train_loader = utils.create_segment_loader(
-            args, kwargs, args.tx_num, config.idx, is_train, train_dataset)
-        is_train = False
-        tx2_test_loader = utils.create_segment_loader(
-            args, kwargs, args.tx_num, config.idx, is_train, test_dataset)
-    del train_dataset
-    del test_dataset
-    return tx2_train_loader, tx2_test_loader
+async def get_init_config(config):
+    print("before init")
+    print(LISTEN_PORT, MASTER_IP)
+    config_received = await get_data(LISTEN_PORT, LOCAL_IP)
+    print("after init")
+    for k, v in config_received.__dict__.items():
+        setattr(config, k, v)
 
 if __name__ == '__main__':
     main()

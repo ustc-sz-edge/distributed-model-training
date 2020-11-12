@@ -11,15 +11,10 @@ import re
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
-#from syft.frameworks.torch.nn import GRU, LSTM, RNN
 from torch.utils.data import TensorDataset, DataLoader
 
-#import syft as sy  # <--NEW: import the PySyft library
 
 from training_module import datasets
-
-# <--NEW: hook PyTorch ie add extra functionalities to support Federated Learning
-#hook = sy.TorchHook(torch)
 
 # <--Tool functions
 font1 = {'color':  'black',
@@ -61,23 +56,32 @@ def create_vm(vm_num=2):
     return vm_list
 
 
+class Partition(object):
+
+    def __init__(self, data, index):
+        self.data = data
+        self.index = index
+
+    def __len__(self):
+        return len(self.index)
+
+    def __getitem__(self, index):
+        data_idx = self.index[index]
+        return self.data[data_idx]
+
 class RandomPartitioner(object):
 
-    def __init__(self, data, sizes, transform=None, seed=2020):
+    def __init__(self, data, partition_sizes, seed=2020):
         self.data = data
-        self.transform = transform
         self.partitions = []
         rng = random.Random()
         rng.seed(seed)
-
-        self.data.targets = np.array(self.data.targets)
-        self.data.data = np.array(self.data.data)
 
         data_len = len(data)
         indexes = [x for x in range(0, data_len)]
         rng.shuffle(indexes)
 
-        for frac in sizes:
+        for frac in partition_sizes:
             part_len = round(frac * data_len)
             self.partitions.append(indexes[0:part_len])
             indexes = indexes[part_len:]
@@ -89,16 +93,12 @@ class RandomPartitioner(object):
 
 class LabelwisePartitioner(object):
 
-    def __init__(self, data, sizes, transform=None, seed=2020):
+    def __init__(self, data, partition_sizes, seed=2020):
         # sizes is a class_num * vm_num matrix
         self.data = data
-        self.transform = transform
-        self.partitions = [list() for _ in range(len(sizes[0]))]
+        self.partitions = [list() for _ in range(len(partition_sizes[0]))]
         rng = random.Random()
         rng.seed(seed)
-
-        self.data.targets = np.array(self.data.targets)
-        self.data.data = np.array(self.data.data)
 
         label_indexes = list()
         class_len = list()
@@ -111,7 +111,7 @@ class LabelwisePartitioner(object):
         # distribute class indexes to each vm according to sizes matrix
         for class_idx in range(len(data.classes)):
             begin_idx = 0
-            for vm_idx, frac in enumerate(sizes[class_idx]):
+            for vm_idx, frac in enumerate(partition_sizes[class_idx]):
                 end_idx = begin_idx + round(frac * class_len[class_idx])
                 self.partitions[vm_idx].extend(label_indexes[class_idx][begin_idx:end_idx])
                 begin_idx = end_idx
@@ -120,6 +120,18 @@ class LabelwisePartitioner(object):
         selected_idxs = self.partitions[partition]
 
         return selected_idxs
+
+def create_dataloaders(dataset, batch_size, selected_idxs=None, shuffle=True, pin_memory=True, num_workers=4):
+    if selected_idxs == None:
+        dataloader = DataLoader(dataset, batch_size=batch_size,
+                                    shuffle=shuffle, pin_memory=pin_memory, num_workers=num_workers)
+    else:
+        partition = Partition(dataset, selected_idxs)
+        dataloader = DataLoader(partition, batch_size=batch_size,
+                                    shuffle=shuffle, pin_memory=pin_memory, num_workers=num_workers)
+    
+    return dataloader
+
 
 def create_bias_selected_data(args, selected_idxs, dataset):
 
@@ -193,67 +205,6 @@ def create_bias_federated_loader(args, kwargs, vm_list, is_train, dataset, selec
 
     return vm_loaders
 
-
-'''
-def create_bias_federated_loader(args, kwargs, vm_list, is_train, dataset, selected_idxs):
-    vm_loaders = list()
-    for vm_idx in range(0, args.vm_num, 2):
-        selected_data, selected_targets = create_bias_selected_data(args, selected_idxs[int(vm_idx/2)], dataset)
-        data_len = len(selected_data)
-        print('--[Debug] vm:{}-data len:{}'.format(vm_idx, data_len))
-        data_transform = datasets.load_default_transform(args.dataset_type)
-        vm_dataset_instance = datasets.VMDataset(selected_data, selected_targets, data_transform).federate([vm_list[vm_idx]])
-        if is_train:
-            vm_loader_instance = sy.FederatedDataLoader( #<--this is now a FederatedDataLoader 
-                                 vm_dataset_instance, shuffle = True, batch_size = args.batch_size, **kwargs)
-        else:
-            vm_loader_instance = sy.FederatedDataLoader( #<--this is now a FederatedDataLoader 
-                                 vm_dataset_instance, shuffle = True, batch_size = args.vm_test_batch_size, **kwargs)
-                                 
-        vm_loaders.append(vm_loader_instance)
-
-        print('--[Debug] vm:{}-data len:{}'.format(vm_idx + 1, data_len))
-        data_transform = datasets.load_customized_transform(args.dataset_type)
-        vm_dataset_instance = datasets.VMDataset(selected_data, selected_targets, data_transform).federate([vm_list[vm_idx + 1]])
-        if is_train:
-            vm_loader_instance = sy.FederatedDataLoader( #<--this is now a FederatedDataLoader 
-                                 vm_dataset_instance, shuffle = True, batch_size = args.batch_size, **kwargs)
-        else:
-            vm_loader_instance = sy.FederatedDataLoader( #<--this is now a FederatedDataLoader 
-                                 vm_dataset_instance, shuffle = True, batch_size = args.vm_test_batch_size, **kwargs)
-                                 
-        vm_loaders.append(vm_loader_instance)
-        
-    return vm_loaders
-
-def create_bias_selected_data(args, selected_idxs, dataset):
-    
-    #<--create initial empty datasets and targets numpy.ndarray
-    targets_array = np.array(dataset.targets)
-    targets_shape = list(targets_array.shape)
-    #print(targets_array.shape)
-    targets_shape[0] = 0
-    init_targets_shape = tuple(targets_shape)
-    selected_targets = np.empty(init_targets_shape)
-    
-    data_shape = list(dataset.data.shape)
-    data_shape[0] = 0
-    init_data_shape = tuple(data_shape)
-    selected_data = np.empty(init_data_shape)
-    
-    for idx in range(len(selected_idxs)):
-        #print(len(targets_array[targets_array == selected_idxs[idx]]))
-        #print(targets_array[targets_array == selected_idxs[idx]].shape)
-        #print(dataset.data[targets_array == selected_idxs[idx]].shape)
-        
-        selected_targets = np.concatenate((selected_targets, targets_array[targets_array == selected_idxs[idx]]),axis = 0)
-        selected_data = np.concatenate((selected_data, dataset.data[targets_array == selected_idxs[idx]]), axis = 0)
-        
-    if args.dataset_type == 'CIFAR10' or args.dataset_type == 'CIFAR100':
-        selected_data = np.transpose(selected_data, (0, 3, 1, 2)) #<--for CIFAR10 & CIFAR100
-    
-    return np.float32(selected_data), np.int64(selected_targets)
-'''
 
 def create_random_selected_data(args, num_data, dataset):
 

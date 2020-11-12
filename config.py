@@ -4,7 +4,10 @@ from torch.utils.tensorboard import SummaryWriter
 from communication_module.comm_utils import *
 
 WORKER_IP_LIST = [
-    "127.0.0.1"
+    "192.168.1.11",
+    "192.168.1.12",
+    "192.168.1.14",
+    "192.168.1.17"
 ]
 
 
@@ -52,30 +55,33 @@ class Worker:
     def __start_remote_worker_process(self):
         pass
 
-    def send_config(self):
-        return send_worker_state(self.config, self.ip_addr, self.listen_port)
+    async def send_config(self):
+        print("before send", self.idx, self.ip_addr, self.listen_port, self.master_port)
+        await send_worker_state(self.config, self.ip_addr, self.listen_port)
 
-    def get_config(self):
-        return get_worker_state(listen_port=self.master_port, listen_ip=self.ip_addr)
+    async def get_config(self):
+        self.config = await get_worker_state(listen_port=self.master_port, listen_ip="192.168.1.100")
 
     async def local_training(self):
         self.config.action = ClientAction.LOCAL_TRAINING
+        print("before send", self.idx, self.ip_addr, self.listen_port, self.master_port)
         await self.send_config()
+        print("after send", self.idx)
         recv_config = await self.get_config()
+        print("after get", self.idx)
         self.config = recv_config
-
 
 class CommonConfig:
     def __init__(self):
         # global_config.writer.add_scalar('Accuracy/test', np.random.random(), n_iter)
         self.recoder: SummaryWriter = SummaryWriter()
 
-        self.dataset_type = 'MNIST'
-        self.model_type = 'LR'
+        self.dataset_type = 'CIFAR10'
+        self.model_type = 'AlexNet'
         self.use_cuda = True
         self.training_mode = 'local'
 
-        self.worker_num = 1
+        self.worker_num = len(WORKER_IP_LIST)
 
         self.epoch_start = 0
         self.epoch = 500
@@ -96,16 +102,17 @@ class ClientConfig:
     def __init__(self,
                  idx: int,
                  master_ip_addr: str,
-                 action: str
+                 action: str,
+                 custom: dict = dict()
                  ):
         self.idx = idx
         self.master_ip_addr = master_ip_addr
         self.action = action
+        self.custom = custom
         self.epoch_num: int = 1
         self.model = list()
         self.para = dict()
         self.resource = {"CPU": "1"}
-        self.custom = dict()
         self.acc: float = 0
         self.loss: float = 1
         self.running_time: int = 0

@@ -8,115 +8,117 @@ import torch.nn.functional as F
 import gc
 from utils import printer, time_since
 
-# def MakeLayers(params_list):
-#     conv_layers = nn.Sequential()
-#     fc_layers = nn.Sequential()
-#     c_idx=p_idx=f_idx=1
-#     for param in params_list:
-#         if param[1] == 'Conv':
-#             conv_layers.add_module(param[0], nn.Conv2d(
-#                 param[2][0], param[2][1], param[2][2], param[2][3],param[2][4]))
-#             if len(param) >=4:
-#                 if param[3] == 'Batchnorm':
-#                     conv_layers.add_module(
-#                         'batchnorm'+str(c_idx), nn.BatchNorm2d(param[2][1]))
-#                 if param[3]=='Relu' or (param[3] == 'Batchnorm' and param[4]=='Relu'):
-#                     conv_layers.add_module('relu'+str(c_idx),nn.ReLU(inplace=True))
-#                 else:
-#                     conv_layers.add_module('sigmoid'+str(c_idx),nn.Sigmoid())
-#             if len(param) >=6 :
-#                 if param[3] == 'Batchnorm':
-#                     if param[5]=='Maxpool':
-#                         conv_layers.add_module(
-#                             'maxpool'+str(p_idx), nn.MaxPool2d(param[6][0], param[6][1],param[6][2]))
-#                     else:
-#                         conv_layers.add_module(
-#                             'avgpool'+str(p_idx), nn.AvgPool2dparam[6][0], param[6][1],param[6][2])
-#                 else:
-#                     if param[4]=='Maxpool':
-#                         conv_layers.add_module(
-#                             'maxpool'+str(p_idx), nn.MaxPool2d(param[5][0], param[5][1],param[5][2]))
-#                     else:
-#                         conv_layers.add_module(
-#                             'avgpool'+str(p_idx), nn.AvgPool2dparam[5][0], param[5][1],param[5][2])
-#                 p_idx+=1
-#             c_idx+=1
-            
-#         else:
-#             fc_layers.add_module(param[0], nn.Linear(param[2][0], param[2][1]))
-#             if len(param) >= 4:
-#                 if param[3] == 'Dropout':
-#                     fc_layers.add_module('dropout', nn.Dropout(param[4]))
-#                 if param[3] == 'Relu' or (param[3]=='Dropout' and len(param)==6 and param[5]=='Relu'):
-#                     fc_layers.add_module('relu'+str(f_idx), nn.ReLU(inplace=True))
-#                 elif param[3] == 'Sigmoid' or (param[3]=='Dropout' and len(param)==6 and param[5]=='Sigmoid'):
-#                     fc_layers.add_module('sigmoid'+str(f_idx), nn.Sigmoid())
-#                 elif param[3] == 'Softmax' or (param[3]=='Dropout' and len(param)==6 and param[5]=='Softmax'):
-#                     fc_layers.add_module('softmax'+str(f_idx), nn.Softmax())
-#             f_idx+= 1
-#     return conv_layers, fc_layers
-
+# sys.path.insert(0, '..')
+# from training_module.utils import printer, time_since
 
 # class MyNet(nn.Module):
 #     def __init__(self, params_list):
 #         super(MyNet, self).__init__()
-#         self.features, self.classifier = MakeLayers(params_list)
+#         self.params_list = params_list
+#         for param in params_list:
+#             # layers = []
+#             if param[1] == 'Conv':
+#                 layers = nn.Conv2d(
+#                     param[2][0], param[2][1], param[2][2], param[2][3],param[2][4])
+#                 if len(param) >=4:
+#                     if param[3] == 'Batchnorm':
+#                         layers.append(nn.BatchNorm2d(param[2][1]))
+#                     if param[3]=='Relu' or (param[3] == 'Batchnorm' and param[4]=='Relu'):
+#                         layers.append(nn.ReLU(inplace=True))
+#                     else:
+#                         layers.append(nn.Sigmoid())
+#                 if len(param) >=6 :
+#                     if param[3] == 'Batchnorm':
+#                         if param[5]=='Maxpool':
+#                             layers.append(nn.MaxPool2d(param[6][0], param[6][1],param[6][2]))
+#                         else:
+#                             layers.append(nn.AvgPool2dparam[6][0], param[6][1],param[6][2])
+#                     else:
+#                         if param[4]=='Maxpool':
+#                             layers.append(nn.MaxPool2d(param[5][0], param[5][1],param[5][2]))
+#                         else:
+#                             layers.append(nn.AvgPool2dparam[5][0], param[5][1],param[5][2])
+#             else:
+#                 layers = nn.Linear(param[2][0], param[2][1])
+#                 if len(param) >= 4:
+#                     if param[3] == 'Dropout':
+#                         layers.append(nn.Dropout(param[4]))
+#                     if param[3] == 'Relu' or (param[3]=='Dropout' and len(param)==6 and param[5]=='Relu'):
+#                         layers.append(nn.ReLU(inplace=True))
+#                     elif param[3] == 'Sigmoid' or (param[3]=='Dropout' and len(param)==6 and param[5]=='Sigmoid'):
+#                         layers.append(nn.Sigmoid())
+#                     elif param[3] == 'Softmax' or (param[3]=='Dropout' and len(param)==6 and param[5]=='Softmax'):
+#                         layers.append(nn.Softmax())
+#             setattr(self, param[0], layers)
 
 #     def forward(self, x):
-#         if len(self.features) > 0:
-#             feature = self.features(x)
-#             linear_input = torch.flatten(feature, 1)
-#             output = self.classifier(linear_input)
-#         else:
-#             output = self.classifier(x)
-#         return F.log_softmax(output, dim=1)
+#         for param in self.params_list:
+#             layer = getattr(self, param[0])
+#             x = layer(x)
+#         return F.log_softmax(x, dim=1)
+
+def MakeLayers(params_list):
+    conv_layers = nn.Sequential()
+    fc_layers = nn.Sequential()
+    c_idx=p_idx=f_idx=1
+    for param in params_list:
+        if param[1] == 'Conv':
+            conv_layers.add_module(param[0], nn.Conv2d(
+                param[2][0], param[2][1], param[2][2], param[2][3],param[2][4]))
+            if len(param) >=4:
+                if param[3] == 'Batchnorm':
+                    conv_layers.add_module(
+                        'batchnorm'+str(c_idx), nn.BatchNorm2d(param[2][1]))
+                if param[3]=='Relu' or (param[3] == 'Batchnorm' and param[4]=='Relu'):
+                    conv_layers.add_module('relu'+str(c_idx),nn.ReLU(inplace=True))
+                else:
+                    conv_layers.add_module('sigmoid'+str(c_idx),nn.Sigmoid())
+            if len(param) >=6 :
+                if param[3] == 'Batchnorm':
+                    if param[5]=='Maxpool':
+                        conv_layers.add_module(
+                            'maxpool'+str(p_idx), nn.MaxPool2d(param[6][0], param[6][1],param[6][2]))
+                    else:
+                        conv_layers.add_module(
+                            'avgpool'+str(p_idx), nn.AvgPool2dparam[6][0], param[6][1],param[6][2])
+                else:
+                    if param[4]=='Maxpool':
+                        conv_layers.add_module(
+                            'maxpool'+str(p_idx), nn.MaxPool2d(param[5][0], param[5][1],param[5][2]))
+                    else:
+                        conv_layers.add_module(
+                            'avgpool'+str(p_idx), nn.AvgPool2dparam[5][0], param[5][1],param[5][2])
+                p_idx+=1
+            c_idx+=1
+            
+        else:
+            fc_layers.add_module(param[0], nn.Linear(param[2][0], param[2][1]))
+            if len(param) >= 4:
+                if param[3] == 'Dropout':
+                    fc_layers.add_module('dropout', nn.Dropout(param[4]))
+                if param[3] == 'Relu' or (param[3]=='Dropout' and len(param)==6 and param[5]=='Relu'):
+                    fc_layers.add_module('relu'+str(f_idx), nn.ReLU(inplace=True))
+                elif param[3] == 'Sigmoid' or (param[3]=='Dropout' and len(param)==6 and param[5]=='Sigmoid'):
+                    fc_layers.add_module('sigmoid'+str(f_idx), nn.Sigmoid())
+                elif param[3] == 'Softmax' or (param[3]=='Dropout' and len(param)==6 and param[5]=='Softmax'):
+                    fc_layers.add_module('softmax'+str(f_idx), nn.Softmax())
+            f_idx+= 1
+    return conv_layers, fc_layers
+
 
 class MyNet(nn.Module):
     def __init__(self, params_list):
         super(MyNet, self).__init__()
-        self.params_list = params_list
-        for param in params_list:
-            # layers = []
-            if param[1] == 'Conv':
-                layers = nn.Conv2d(
-                    param[2][0], param[2][1], param[2][2], param[2][3],param[2][4])
-                if len(param) >=4:
-                    if param[3] == 'Batchnorm':
-                        layers.append(nn.BatchNorm2d(param[2][1]))
-                    if param[3]=='Relu' or (param[3] == 'Batchnorm' and param[4]=='Relu'):
-                        layers.append(nn.ReLU(inplace=True))
-                    else:
-                        layers.append(nn.Sigmoid())
-                if len(param) >=6 :
-                    if param[3] == 'Batchnorm':
-                        if param[5]=='Maxpool':
-                            layers.append(nn.MaxPool2d(param[6][0], param[6][1],param[6][2]))
-                        else:
-                            layers.append(nn.AvgPool2dparam[6][0], param[6][1],param[6][2])
-                    else:
-                        if param[4]=='Maxpool':
-                            layers.append(nn.MaxPool2d(param[5][0], param[5][1],param[5][2]))
-                        else:
-                            layers.append(nn.AvgPool2dparam[5][0], param[5][1],param[5][2])
-            else:
-                layers = nn.Linear(param[2][0], param[2][1])
-                if len(param) >= 4:
-                    if param[3] == 'Dropout':
-                        layers.append(nn.Dropout(param[4]))
-                    if param[3] == 'Relu' or (param[3]=='Dropout' and len(param)==6 and param[5]=='Relu'):
-                        layers.append(nn.ReLU(inplace=True))
-                    elif param[3] == 'Sigmoid' or (param[3]=='Dropout' and len(param)==6 and param[5]=='Sigmoid'):
-                        layers.append(nn.Sigmoid())
-                    elif param[3] == 'Softmax' or (param[3]=='Dropout' and len(param)==6 and param[5]=='Softmax'):
-                        layers.append(nn.Softmax())
-            setattr(self, param[0], layers)
+        self.features, self.classifier = MakeLayers(params_list)
 
     def forward(self, x):
-        for param in self.params_list:
-            layer = getattr(self, param[0])
-            x = layer(x)
-        return F.log_softmax(x, dim=1)
-
+        if len(self.features) > 0:
+            feature = self.features(x)
+            linear_input = torch.flatten(feature, 1)
+            output = self.classifier(linear_input)
+        else:
+            output = self.classifier(x)
+        return F.log_softmax(output, dim=1)
 
 
 #初始化模型的参数由以下几部分构成：
@@ -141,7 +143,7 @@ VGG16=[('conv1_1', 'Conv', (3, 64, 3, 1,0), 'Batchnorm','Relu'), ('conv1_2', 'Co
         ('fc1', 'FC', (512*7*7, 4096), 'Relu'), ('fc2', 'FC', (4096, 4096), 'Relu'),('fc3', 'FC', (4096, 1000))]
 
 
-def train(args, config, tx2_model, device, tx2_train_loader, tx2_test_loader, tx2_optimizer, epoch, fid):
+def train(args, config, tx2_model, device, tx2_train_loader, tx2_test_loader, tx2_optimizer, epoch):
 
     vm_start = time.time()
     tx2_model.train()
@@ -188,10 +190,10 @@ def train(args, config, tx2_model, device, tx2_train_loader, tx2_test_loader, tx
                 vm_loss = vm_loss.item()  # <-- NEW: get the loss back
                 #print("Epoch :{} batch_idx: {} print ok".format(epoch, batch_idx))
                 # print(vm_loss)
-                printer('-->[{}] Train Epoch: {} Local Iter: {} tx2: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                print('-->[{}] Train Epoch: {} Local Iter: {} tx2: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                     time_since(vm_start), epoch, li_idx, config.idx, batch_idx * args.batch_size, 
                     len(tx2_train_loader) * args.batch_size,
-                    100. * batch_idx / len(tx2_train_loader), vm_loss), fid)
+                    100. * batch_idx / len(tx2_train_loader), vm_loss))
 
             # vm_data = vm_data.get()
             # vm_target = vm_target.get()
@@ -207,16 +209,18 @@ def train(args, config, tx2_model, device, tx2_train_loader, tx2_test_loader, tx
 
 
     if args.enable_vm_test:
-        printer('-->[{}] Test set: Epoch: {} tx2: {}'.format(time_since(vm_start), epoch, config.idx), fid)
+        print('-->[{}] Test set: Epoch: {} tx2: {}'.format(time_since(vm_start), epoch, config.idx))
         # <--test for each vm
-        test(args, vm_start, tx2_model, device, tx2_test_loader, epoch, fid)
+        _, test_acc = test(args, vm_start, tx2_model, device, tx2_test_loader, epoch)
 
         # vm_models[vm_idx].move(param_server)
         # vm_models[vm_idx] = vm_models[vm_idx].get()
         # torch.cuda.empty_cache()
         gc.collect()
+    
+    return test_acc
 
-def test(args, start, model, device, test_loader, epoch, fid):
+def test(args, start, model, device, test_loader, epoch):
     model.eval()
 
     test_loss = 0.0
@@ -281,13 +285,13 @@ def test(args, start, model, device, test_loader, epoch, fid):
     test_accuracy = np.float(1.0 * correct / len(test_loader.dataset))
 
     if args.enable_vm_test:  
-        printer('-->[{}] Test set: Epoch: {} Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'.format(
+        print('-->[{}] Test set: Epoch: {} Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'.format(
             time_since(start), epoch, test_loss, correct, len(test_loader.dataset),
-            100. * test_accuracy), fid)
+            100. * test_accuracy))
     else:
-        printer('[{}] Test set: Epoch: {} Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+        print('[{}] Test set: Epoch: {} Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
             time_since(start), epoch, test_loss, correct, len(test_loader.dataset),
-            100. * test_accuracy), fid)
+            100. * test_accuracy))
 
     gc.collect()
 

@@ -4,10 +4,16 @@ import functools
 
 class ServerAction:
     LOCAL_TRAINING = "local_training"
+    SEND_STATES = "send_states"
+    GET_STATES = "get_states"
 
     def execute_action(self, action, worker_list):
         if action == self.LOCAL_TRAINING:
             self.local_training(worker_list)
+        elif action == self.SEND_STATES:
+            self.send_states(worker_list)
+        elif action == self.GET_STATES:
+            self.get_states(worker_list)
 
     @staticmethod
     def send_states(worker_list):

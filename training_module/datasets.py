@@ -1,26 +1,15 @@
-__author__ = 'yang.xu'
-
-#Import required libraries
 import torch
 from torch.utils.data import Dataset
-# import syft as sy
 from torchvision import datasets, transforms
-
-
-class train_test_dataset():
-    def __init__(self, data, targets, num_classes):
-        self.data = data
-        self.targets = targets
-        self.classes = num_classes
 
 class VMDataset(Dataset):
 
-    def __init__(self, data, labels, transform = transforms.ToTensor()):
+    def __init__(self, data, targets, classes, transform=transforms.ToTensor()):
         
         """Args:
              
              images (Numpy Array): Data
-             labels (Numpy Array): Labels corresponding to each data item
+             targets (Numpy Array): targets corresponding to each data item
              transform (Optional): If any torch transform has to be performed on the dataset
              
         """
@@ -30,22 +19,12 @@ class VMDataset(Dataset):
         #<--Data must be initialized as self.data, self.train_data or self.test_data
         self.data = data
         #<--Targets must be initialized as self.targets, self.test_labels or self.train_labels
-        self.targets = labels
-        
-        #<--The data and target must be converted to torch tensors before it is returned by __getitem__ method
-        self.to_torchtensor()
-        
+        self.targets = targets
+
+        self.classes = classes
+
         #<--If any transforms have to be performed on the dataset
         self.transform = transform
-        
-        
-    def to_torchtensor(self):
-        
-        "Transform Numpy Arrays to Torch tensors."
-        
-        self.data = torch.from_numpy(self.data)
-        self.labels = torch.from_numpy(self.targets)
-    
         
     def __len__(self):
         
@@ -79,66 +58,58 @@ class VMDataset(Dataset):
         """
         
         sample = self.data[idx]
-        target = self.targets[idx]
-        # print('--[Debug] sample[0][0]:',sample[0][0])
-        if self.transform:
+        target = int(self.targets[idx])
+        if self.transform is not None:
             sample = self.transform(sample)
-        # print('--[Debug] sample[0][0]:',sample[0][0])
         return sample, target
 
-def load_datasets(dataset_type):
-    train_dataset = []
-    test_dataset = []
+def load_datasets(dataset_type, data_path="/data/lwang/distirbuted-model-training/data"):
     
-    if dataset_type == 'CIFAR10':
-        train_dataset = datasets.CIFAR10('../data', train = True, download = True, transform = None)
+    transform = load_default_transform(dataset_type)
 
-        test_dataset = datasets.CIFAR10('../data', train = False, transform = None)
+    if dataset_type == 'CIFAR10':
+        train_dataset = datasets.CIFAR10(data_path, train = True, download = True, transform=transform)
+        test_dataset = datasets.CIFAR10(data_path, train = False, transform=transform)
 
     elif dataset_type == 'CIFAR100':
-        train_dataset = datasets.CIFAR100('../data', train = True, download = True, transform = None)
-        
-        test_dataset = datasets.CIFAR100('../data', train = False, transform = None)
+        train_dataset = datasets.CIFAR100(data_path, train = True, download = True, transform=transform)
+        test_dataset = datasets.CIFAR100(data_path, train = False, transform=transform)
 
     elif dataset_type == 'FashionMNIST':
-        train_dataset = datasets.FashionMNIST('../data', train = True, download = True, transform = None)
-    
-        test_dataset = datasets.FashionMNIST('../data', train = False, transform = None)
-    
+        train_dataset = datasets.FashionMNIST(data_path, train = True, download = True, transform=transform)
+        test_dataset = datasets.FashionMNIST(data_path, train = False, transform=transform)
+
     elif dataset_type == 'MNIST':
-        train_dataset = datasets.MNIST('../data', train = True, download = True, transform = None)
-    
-        test_dataset = datasets.MNIST('../data', train = False, transform = None)
-                       
+        train_dataset = datasets.MNIST(data_path, train = True, download = True, transform=transform)
+        test_dataset = datasets.MNIST(data_path, train = False, transform=transform)
+
     return train_dataset, test_dataset
 
 def load_default_transform(dataset_type):
     dataset_transform = []
     
     if dataset_type == 'CIFAR10':
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
         dataset_transform = transforms.Compose([
-                           transforms.ToPILImage(),
                            transforms.ToTensor(),
-                           transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+                           normalize
                          ])
 
     elif dataset_type == 'CIFAR100':
         dataset_transform = transforms.Compose([
-                           transforms.ToPILImage(),
                            transforms.ToTensor(),
                            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
                          ])
 
     elif dataset_type == 'FashionMNIST':
           dataset_transform=transforms.Compose([
-                           transforms.ToPILImage(),
                            transforms.ToTensor(),
                            transforms.Normalize((0.1307,), (0.3081,))
                          ])
     
     elif dataset_type == 'MNIST':
           dataset_transform=transforms.Compose([
-                           transforms.ToPILImage(),
                            transforms.ToTensor(),
                            transforms.Normalize((0.1307,), (0.3081,))
                          ])
@@ -150,10 +121,14 @@ def load_customized_transform(dataset_type):
     dataset_transform = []
     
     if dataset_type == 'CIFAR10':
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
         dataset_transform = transforms.Compose([
                            transforms.ToPILImage(),
-                           transforms.RandomHorizontalFlip(0.6),
-                           transforms.ToTensor()
+                           transforms.RandomHorizontalFlip(),
+                           transforms.RandomCrop(32, 4),
+                           transforms.ToTensor(),
+                           normalize
                          ])
 
     elif dataset_type == 'CIFAR100':

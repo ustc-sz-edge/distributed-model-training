@@ -5,23 +5,6 @@ import re
 import torch.nn.functional as F
 import torch.nn as nn
 
-# <--For Sent140
-'''
-an automatically generated sentiment analysis dataset that annotates tweets
-based on the emoticons present in them. Each device is a different twitter user
-'''
-
-
-class Sent140_Net(nn.Module):
-    def __init__(self):
-        super(CIFAR10_Net, self).__init__()
-        pass
-
-    def forward(self, x):
-        pass
-        return None
-
-
 # <--For CIFAR10
 
 class CIFAR10_Net(nn.Module):
@@ -115,39 +98,63 @@ class MNIST_LR_Net(nn.Module):
         return F.log_softmax(x, dim=1)
 
 
-def create_model_instance(dataset_type, model_type, device):
+def create_model_instance(dataset_type, model_type):
     if dataset_type == 'FashionMNIST':
         if model_type == 'LR':
-            model = MNIST_LR_Net().to(device)
+            model = MNIST_LR_Net()
         else:
-            model = MNIST_Net().to(device)
+            model = MNIST_Net()
 
     elif dataset_type == 'MNIST':
         if model_type == 'LR':
-            model = MNIST_LR_Net().to(device)
+            model = MNIST_LR_Net()
         else:
-            model = MNIST_Small_Net().to(device)
+            model = MNIST_Small_Net()
 
     elif dataset_type == 'CIFAR10':
 
         if model_type == 'Deep':
-            model = CIFAR10_Deep_Net().to(device)
-            decay_rate = 0.98
+            model = CIFAR10_Deep_Net()
+        elif model_type == 'AlexNet':
+            model = AlexNet()
         else:
-            model = CIFAR10_Net().to(device)
-            decay_rate = 0.98
-
-    elif dataset_type == 'Sent140':
-
-        if model_type == 'LSTM':
-            model = Sent140_Net().to(device)
-            decay_rate = 0.99
-        else:
-            model = Sent140_Net().to(device)
-            decay_rate = 0.99
+            model = CIFAR10_Net()
 
     return model
 
+class AlexNet(nn.Module):
+    def __init__(self):
+        super(AlexNet, self).__init__()
+        self.features = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2),
+            nn.Conv2d(64, 192, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2),
+            nn.Conv2d(192, 384, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(384, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2),
+        )
+        self.classifier = nn.Sequential(
+            # nn.Dropout(),
+            nn.Linear(256 * 2 * 2, 1024),
+            nn.ReLU(inplace=True),
+            # nn.Dropout(),
+            nn.Linear(1024, 512),
+            nn.ReLU(inplace=True),
+            nn.Linear(512, 10),
+        )
+
+    def forward(self, x):
+        x = self.features(x)
+        x = x.view(-1, 256 * 2 * 2)
+        x = self.classifier(x)
+        return F.log_softmax(x, dim=1)
 
 # 从模型到列表
 def Seq2Tup(sequen):

@@ -29,73 +29,92 @@ def recode_state(paras, result):
 def main():
     # Init global parameter
     common_config = CommonConfig()
-    assert common_config.worker_num >= len(WORKER_IP_LIST)
-    for worker_idx in range(common_config.worker_num):
+    # assert common_config.worker_num >= len(WORKER_IP_LIST)
+    device = torch.device("cuda" if common_config.use_cuda and torch.cuda.is_available() else "cpu")
+    
+    worker_idx_list = [0, 1, 3, 6]
+
+    client_port=[47001, 47002, 47003, 47004,47005,47006,47007,47008,47009,47010]
+    master_port=[57001, 57002, 57003, 57004,57005,57006,57007,57008,57009,57010]
+    # adjacency_matrix = [[0, 1, 0, 0],
+    #                     [0, 0, 1, 0],
+    #                     [0, 0, 0, 1],
+    #                     [1, 0, 0, 0]]
+    # adjacency_matrix = np.array(adjacency_matrix)
+
+    # for worker_idx in range(common_config.worker_num):
+    for idx, worker_idx in enumerate(worker_idx_list):
+        custom = dict()
+        # custom["neighbors"] = list()
+        # for neighbor_idx, link in enumerate(adjacency_matrix[worker_idx]):
+        #     if link == 1:
+        #         custom["neighbors"].append(WORKER_IP_LIST[neighbor_idx])
+
         common_config.worker_list.append(
             Worker(config=ClientConfig(idx=worker_idx,
                                        master_ip_addr=socket.gethostbyname(socket.gethostname()),
-                                       action=ClientAction.LOCAL_TRAINING),
-                   ip_addr=WORKER_IP_LIST[worker_idx],
-                   master_port=common_config.master_listen_port_base + worker_idx,
-                   client_port=common_config.client_listen_port_base + worker_idx
+                                       action=ClientAction.LOCAL_TRAINING,
+                                       custom=custom),
+                   ip_addr=WORKER_IP_LIST[idx],
+                   master_port=master_port[worker_idx],
+                   client_port=client_port[worker_idx]
                    )
         )
 
-    device = torch.device("cuda" if common_config.use_cuda and torch.cuda.is_available() else "cpu")
-    kwargs = {'num_workers': 1, 'pin_memory': True} if common_config.use_cuda else {}
-
-    """Create model, dataset, etc
-
-
-        """
     # Create federated model instance
-    global_model = models.create_model_instance(
-        common_config.dataset_type, common_config.model_type, device)
+    global_model = models.create_model_instance(common_config.dataset_type, common_config.model_type)
+    global_model = global_model.to(device)
     # print("init", list(global_model.named_parameters()))
 
     # print(models.Net2Tuple(global_model))
-    for idx, worker in enumerate(common_config.worker_list):
-            worker.config.para = dict(global_model.named_parameters())
-            worker.config.model = models.Net2Tuple(global_model)
+    init_para = dict(global_model.named_parameters())
+    model_tuple = models.Net2Tuple(global_model)
+
+    train_dataset, test_dataset = datasets.load_datasets(
+                                    common_config.dataset_type)
+    partition_sizes = [1.0 / len(WORKER_IP_LIST) for _ in WORKER_IP_LIST]
+    train_data_partition = utils.RandomPartitioner(train_dataset, partition_sizes=partition_sizes)
+    test_data_partition = utils.RandomPartitioner(test_dataset, partition_sizes=partition_sizes)
+
+    for worker_idx, worker in enumerate(common_config.worker_list):
+            worker.config.para = init_para
+            worker.config.model = model_tuple
+            worker.config.custom["dataset_type"] = common_config.dataset_type
+            worker.config.custom["train_data_idxes"] = train_data_partition.use(worker_idx)
+            worker.config.custom["test_data_idxes"] = test_data_partition.use(worker_idx)
 
     # Create dataset instance
-    train_dataset, test_dataset = datasets.load_datasets(
-        common_config.dataset_type)
-    # test_loader = utils.create_server_test_loader(
-    #     common_config, kwargs, test_dataset)
-    is_train = False
-    test_loader = utils.create_segment_loader(
-            common_config, kwargs, 1, 1, is_train, test_dataset)
-
-    # if not args.epoch_start == 0:
-    #     global_model.load_state_dict(torch.load(LOAD_MODEL_PATH))
+    test_loader = utils.create_dataloaders(test_dataset, batch_size=128, shuffle=False)
 
     # TODO: Add thread to listen new client
 
     global_para = dict(global_model.named_parameters())
 
-    # for worker in common_config.worker_list:
-    #     worker.config.model = models.Net2Tuple(global_model)
-    #     worker.config.para = global_para
 
     action_queue = Queue()
 
     # Or you can add all action ad once
-    action_queue.put(ServerAction.LOCAL_TRAINING)
+    
 
     for epoch_idx in range(1, 1 + common_config.epoch):
         # Execute action
+        print("before send")
+        action_queue.put(ServerAction.SEND_STATES)
         ServerAction().execute_action(action_queue.get(), common_config.worker_list)
+        print("after send")
 
-        # Add next action, may be conditionally
-        action_queue.put(ServerAction.LOCAL_TRAINING)
+        print("before get")
+        action_queue.put(ServerAction.GET_STATES)
+        ServerAction().execute_action(action_queue.get(), common_config.worker_list)
+        print("after get")
+
 
         # Do somethings for recoder
 
         for worker in common_config.worker_list:
             common_config.recoder.add_scalar('Accuracy/worker_' + str(worker.config.idx), worker.config.acc,
                                              epoch_idx)
-            print('Accuracy/worker_' + str(worker.config.idx) + str(worker.config.acc) + "Epoch" +
+            print('Accuracy/worker_' + str(worker.config.idx) + ':' + str(worker.config.acc) + " Epoch_" +
                   str(epoch_idx))
 
         # Do something for global model

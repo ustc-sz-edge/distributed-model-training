@@ -11,15 +11,11 @@ import re
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
-#from syft.frameworks.torch.nn import GRU, LSTM, RNN
 from torch.utils.data import TensorDataset, DataLoader
 
-#import syft as sy  # <--NEW: import the PySyft library
 
 import datasets
 
-# <--NEW: hook PyTorch ie add extra functionalities to support Federated Learning
-#hook = sy.TorchHook(torch)
 
 # <--Tool functions
 font1 = {'color':  'black',
@@ -60,6 +56,81 @@ def create_vm(vm_num=2):
         vm_list.append(vm_instance)
     return vm_list
 
+class Partition(object):
+
+    def __init__(self, data, index):
+        self.data = data
+        self.index = index
+
+    def __len__(self):
+        return len(self.index)
+
+    def __getitem__(self, index):
+        data_idx = self.index[index]
+        return self.data[data_idx]
+
+class RandomPartitioner(object):
+
+    def __init__(self, data, partition_sizes, seed=2020):
+        self.data = data
+        self.partitions = []
+        rng = random.Random()
+        rng.seed(seed)
+
+        data_len = len(data)
+        indexes = [x for x in range(0, data_len)]
+        rng.shuffle(indexes)
+
+        for frac in partition_sizes:
+            part_len = round(frac * data_len)
+            self.partitions.append(indexes[0:part_len])
+            indexes = indexes[part_len:]
+
+    def use(self, partition):
+        selected_idxs = self.partitions[partition]
+
+        return selected_idxs
+
+class LabelwisePartitioner(object):
+
+    def __init__(self, data, partition_sizes, seed=2020):
+        # sizes is a class_num * vm_num matrix
+        self.data = data
+        self.partitions = [list() for _ in range(len(partition_sizes[0]))]
+        rng = random.Random()
+        rng.seed(seed)
+
+        label_indexes = list()
+        class_len = list()
+        # label_indexes includes class_num lists. Each list is the set of indexs of a specific class
+        for class_idx in range(len(data.classes)):
+            label_indexes.append(list(np.where(data.targets == class_idx)[0]))
+            class_len.append(len(label_indexes[class_idx]))
+            rng.shuffle(label_indexes[class_idx])
+        
+        # distribute class indexes to each vm according to sizes matrix
+        for class_idx in range(len(data.classes)):
+            begin_idx = 0
+            for vm_idx, frac in enumerate(partition_sizes[class_idx]):
+                end_idx = begin_idx + round(frac * class_len[class_idx])
+                self.partitions[vm_idx].extend(label_indexes[class_idx][begin_idx:end_idx])
+                begin_idx = end_idx
+
+    def use(self, partition):
+        selected_idxs = self.partitions[partition]
+
+        return selected_idxs
+
+def create_dataloaders(dataset, batch_size, selected_idxs=None, shuffle=True, pin_memory=True, num_workers=4):
+    if selected_idxs == None:
+        dataloader = DataLoader(dataset, batch_size=batch_size,
+                                    shuffle=shuffle, pin_memory=pin_memory, num_workers=num_workers)
+    else:
+        partition = Partition(dataset, selected_idxs)
+        dataloader = DataLoader(partition, batch_size=batch_size,
+                                    shuffle=shuffle, pin_memory=pin_memory, num_workers=num_workers)
+    
+    return dataloader
 
 def create_bias_selected_data(args, selected_idxs, dataset):
 
