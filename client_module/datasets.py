@@ -63,7 +63,7 @@ class VMDataset(Dataset):
             sample = self.transform(sample)
         return sample, target
 
-def load_datasets(dataset_type, data_path="/data/lwang/data"):
+def load_datasets(dataset_type, data_path="../data/"):
     
     transform = load_default_transform(dataset_type)
 
