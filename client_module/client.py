@@ -21,7 +21,7 @@ import utils
 parser = argparse.ArgumentParser(description='Distributed Client')
 parser.add_argument('--idx', type=str, default="0",
                     help='index of worker')
-parser.add_argument('--master_ip', type=str, default="192.168.1.100",
+parser.add_argument('--master_ip', type=str, default="192.168.1.104",
                     help='IP address for controller or ps')
 parser.add_argument('--listen_port', type=int, default=47000, metavar='N',
                     help='Port used to listen msg from master')
@@ -45,7 +45,7 @@ args = parser.parse_args()
 MASTER_IP = args.master_ip
 LISTEN_PORT = args.listen_port
 MASTER_LISTEN_PORT = args.master_listen_port
-LOCAL_IP = "192.168.1." + str(11+int(args.idx))
+LOCAL_IP = "192.168.1.105"
 
 device = torch.device("cuda" if args.use_cuda and torch.cuda.is_available() else "cpu")
 
